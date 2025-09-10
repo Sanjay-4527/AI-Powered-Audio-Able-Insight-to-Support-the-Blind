@@ -45,7 +45,7 @@ python script.py
 
 
 
-For any questions, feel free to reach out at aashrith2415@gmail.com.
+For any questions, feel free to reach out at sanjayvanam16181@gmail.com.
 
 
 ### Notes:
