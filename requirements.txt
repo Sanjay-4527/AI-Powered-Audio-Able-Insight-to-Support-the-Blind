@@ -1,0 +1,11 @@
+# Core dependencies
+numpy==1.21.0
+opencv-python==4.5.3.56
+argparse==1.4.0
+SpeechRecognition==3.8.1
+gTTS==2.2.2
+pyttsx3
+
+# Build tools (to avoid pip/setuptools errors)
+setuptools>=65.5.0
+wheel>=0.38.0

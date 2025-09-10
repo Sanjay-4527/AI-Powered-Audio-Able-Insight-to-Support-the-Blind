@@ -1,0 +1,472 @@
+#code with mobile cam 
+
+
+import cv2
+import numpy as np
+import os
+import pyttsx3
+import time
+
+# File paths
+weights_path = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\yolov3.weights"
+config_path = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\yolov3.cfg"
+classes_file = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\coco.names"
+
+# Load class names
+with open(classes_file, 'r') as f:
+    classes = [line.strip() for line in f.readlines()]
+
+# Initialize Text-to-Speech
+engine = pyttsx3.init()
+
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
+
+# Load YOLO
+if not os.path.exists(weights_path):
+    raise FileNotFoundError(f"Error: {weights_path} not found!")
+if not os.path.exists(config_path):
+    raise FileNotFoundError(f"Error: {config_path} not found!")
+if not os.path.exists(classes_file):
+    raise FileNotFoundError(f"Error: {classes_file} not found!")
+
+net = cv2.dnn.readNet(weights_path, config_path)
+layer_names = net.getLayerNames()
+output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+
+# Camera parameters (calibrate these values)
+KNOWN_HEIGHT = 1.7  # Height in meters
+FOCAL_LENGTH = 600   # Focal length in pixels (calibrate this)
+
+# Start video capture using mobile phone camera
+cap = cv2.VideoCapture('http://192.168.0.107:8080/video')  # Replace with your actual IP address and port
+last_spoken_time = {}
+distance_buffer = []
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    height, width, _ = frame.shape
+
+    blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+    net.setInput(blob)
+    outputs = net.forward(output_layers)
+
+    boxes, confidences, class_ids = [], [], []
+
+    for output in outputs:
+        for detection in output:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+            if confidence > 0.5:
+                center_x = int(detection[0] * width)
+                center_y = int(detection[1] * height)
+                w = int(detection[2] * width)
+                h = int(detection[3] * height)
+
+                x = int(center_x - w / 2)
+                y = int(center_y - h / 2)
+
+                boxes.append([x, y, w, h])
+                confidences.append(float(confidence))
+                class_ids.append(class_id)
+
+    indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+
+    for i in range(len(boxes)):
+        if i in indexes:
+            x, y, w, h = boxes[i]
+            label = str(classes[class_ids[i]])
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(frame, label, (x, y + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            # Calculate distance
+            if h > 0:  # Avoid division by zero
+                distance = (KNOWN_HEIGHT * FOCAL_LENGTH) / h
+                distance_cm = distance * 100  # Convert to centimeters
+                
+                # Smooth distance measurements
+                distance_buffer.append(distance_cm)
+                if len(distance_buffer) > 5:  # Keep the last 5 measurements
+                    distance_buffer.pop(0)
+                smoothed_distance = np.mean(distance_buffer)
+
+                # Check if enough time has passed to speak about this object
+                current_time = time.time()
+                if label not in last_spoken_time or (current_time - last_spoken_time[label] >= 10):
+                    speak(f"The {label} is {smoothed_distance:.2f} centimeters ahead of you")
+                    last_spoken_time[label] = current_time
+
+    cv2.imshow('Image', frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+
+=========================================================================================================================
+
+
+import cv2
+import numpy as np
+import os
+import pyttsx3
+import time
+
+# File paths
+weights_path = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\yolov3.weights"
+config_path = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\yolov3.cfg"
+classes_file = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\coco.names"
+
+# Load class names
+with open(classes_file, 'r') as f:
+    classes = [line.strip() for line in f.readlines()]
+
+# Initialize Text-to-Speech
+engine = pyttsx3.init()
+
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
+
+# Load YOLO
+if not os.path.exists(weights_path):
+    raise FileNotFoundError(f"Error: {weights_path} not found!")
+if not os.path.exists(config_path):
+    raise FileNotFoundError(f"Error: {config_path} not found!")
+if not os.path.exists(classes_file):
+    raise FileNotFoundError(f"Error: {classes_file} not found!")
+
+net = cv2.dnn.readNet(weights_path, config_path)
+layer_names = net.getLayerNames()
+output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+
+# Camera parameters (calibrate these values)
+KNOWN_HEIGHT = 1.7  # Height in meters
+FOCAL_LENGTH = 600   # Focal length in pixels (calibrate this)
+
+# Start video capture
+cap = cv2.VideoCapture(0)
+last_spoken_time = {}
+
+while True:
+    ret, frame = cap.read()
+    height, width, _ = frame.shape
+
+    blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+    net.setInput(blob)
+    outputs = net.forward(output_layers)
+
+    boxes, confidences, class_ids = [], [], []
+    
+    for output in outputs:
+        for detection in output:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+            if confidence > 0.5:
+                center_x = int(detection[0] * width)
+                center_y = int(detection[1] * height)
+                w = int(detection[2] * width)
+                h = int(detection[3] * height)
+
+                x = int(center_x - w / 2)
+                y = int(center_y - h / 2)
+
+                boxes.append([x, y, w, h])
+                confidences.append(float(confidence))
+                class_ids.append(class_id)
+
+    indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+
+    current_detected_objects = set()
+    for i in range(len(boxes)):
+        if i in indexes:
+            x, y, w, h = boxes[i]
+            label = str(classes[class_ids[i]])
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(frame, label, (x, y + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            current_detected_objects.add(label)
+
+            # Calculate distance
+            if h > 0:  # Avoid division by zero
+                distance = (KNOWN_HEIGHT * FOCAL_LENGTH) / h
+                distance_cm = distance * 100  # Convert to centimeters
+
+                # Check if enough time has passed to speak about this object
+                current_time = time.time()
+                if label not in last_spoken_time or (current_time - last_spoken_time[label] >= 10):
+                    speak(f"The {label} is {distance_cm:.2f} centimeters ahead of you")
+                    last_spoken_time[label] = current_time
+
+    cv2.imshow('Image', frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------- object deteection code with distance
+
+
+
+
+import cv2
+import numpy as np
+import os
+import pyttsx3  # For text-to-speech
+import time
+
+# File paths
+weights_path = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\yolov3.weights"
+config_path = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\yolov3.cfg"
+classes_file = r"C:\Projects\AI-powered Audio Able Insight to Support Blind\yolo\coco.names"
+
+# Load class names
+with open(classes_file, 'r') as f:
+    classes = [line.strip() for line in f.readlines()]
+
+# Initialize Text-to-Speech
+engine = pyttsx3.init()
+
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
+
+# Load YOLO
+if not os.path.exists(weights_path):
+    raise FileNotFoundError(f"Error: {weights_path} not found!")
+if not os.path.exists(config_path):
+    raise FileNotFoundError(f"Error: {config_path} not found!")
+if not os.path.exists(classes_file):
+    raise FileNotFoundError(f"Error: {classes_file} not found!")
+
+net = cv2.dnn.readNet(weights_path, config_path)
+layer_names = net.getLayerNames()
+output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+
+# Camera parameters (example values, these need to be calibrated for your setup)
+KNOWN_HEIGHT = 1.7  # Height of the object in meters (e.g., average human height)
+FOCAL_LENGTH = 600  # This needs to be set based on your camera (in pixels)
+
+# Start video capture
+cap = cv2.VideoCapture(0)
+
+# Dictionary to track when to speak for each detected object
+last_spoken_time = {}
+
+while True:
+    # Capture frame-by-frame
+    ret, frame = cap.read()
+    height, width, _ = frame.shape
+
+    # Prepare the frame for object detection
+    blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+    net.setInput(blob)
+    outputs = net.forward(output_layers)
+
+    # Process outputs
+    boxes, confidences, class_ids = [], [], []
+    
+    for output in outputs:
+        for detection in output:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+            if confidence > 0.5:  # Adjust confidence threshold as needed
+                center_x = int(detection[0] * width)
+                center_y = int(detection[1] * height)
+                w = int(detection[2] * width)
+                h = int(detection[3] * height)
+
+                # Rectangle coordinates
+                x = int(center_x - w / 2)
+                y = int(center_y - h / 2)
+
+                boxes.append([x, y, w, h])
+                confidences.append(float(confidence))
+                class_ids.append(class_id)
+
+    # Non-max suppression
+    indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+
+    # Draw bounding boxes and give feedback
+    current_detected_objects = set()
+    for i in range(len(boxes)):
+        if i in indexes:
+            x, y, w, h = boxes[i]
+            label = str(classes[class_ids[i]])
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(frame, label, (x, y + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            current_detected_objects.add(label)
+
+            # Calculate distance
+            distance = (KNOWN_HEIGHT * FOCAL_LENGTH) / h  # Distance in meters
+            distance_cm = distance * 100  # Convert to centimeters
+
+            # Check if enough time has passed to speak about this object
+            current_time = time.time()
+            if label not in last_spoken_time or (current_time - last_spoken_time[label] >= 10):
+                speak(f"The {label} is {distance_cm:.2f} centimeters ahead of you")
+                last_spoken_time[label] = current_time
+
+    # Show the frame
+    cv2.imshow('Image', frame)
+
+    # Break the loop on 'q' key press
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release the capture and destroy windows
+cap.release()
+cv2.destroyAllWindows()
+
+
+
+
+-----------------------------------------------------------------------------------------Dummy code
+
+
+
+
+import numpy as np
+import argparse
+import time
+import cv2
+import os
+import speech_recognition as sr
+from gtts import gTTS
+
+# Argument parser
+ap = argparse.ArgumentParser()
+ap.add_argument("-i", "--image", required=True, help="path to input image")
+ap.add_argument("-y", "--yolo", required=True, help="base path to YOLO directory")
+ap.add_argument("-c", "--confidence", type=float, default=0.5, help="minimum probability to filter weak detections")
+ap.add_argument("-t", "--threshold", type=float, default=0.3, help="threshold when applying non-maxima suppression")
+args = vars(ap.parse_args())
+
+# Construct paths to the YOLO files
+labelsPath = os.path.join(args["yolo"], "coco.names")
+weightsPath = os.path.join(args["yolo"], "yolov3.weights")
+configPath = os.path.join(args["yolo"], "yolov8.cfg")
+
+# Print paths for debugging
+print("Labels Path:", labelsPath)
+print("Weights Path:", weightsPath)
+print("Config Path:", configPath)
+
+# Check if files exist
+if not os.path.exists(labelsPath):
+    print(f"Error: Labels file does not exist at {labelsPath}")
+    exit()
+if not os.path.exists(weightsPath):
+    print(f"Error: Weights file does not exist at {weightsPath}")
+    exit()
+if not os.path.exists(configPath):
+    print(f"Error: Config file does not exist at {configPath}")
+    exit()
+
+# Load the model
+print("[INFO] loading YOLO from disk...")
+net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
+
+# Read the labels
+LABELS = open(labelsPath).read().strip().split("\n")
+
+# Set random seed and generate colors for each label
+np.random.seed(42)
+COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), dtype="uint8")
+
+# Load the input image and get its dimensions
+image = cv2.imread(args["image"])
+if image is None:
+    print(f"Error: Could not read image from {args['image']}")
+    exit()
+
+(H, W) = image.shape[:2]
+
+# Determine the output layer names needed from YOLO
+ln = net.getLayerNames()
+ln = [ln[i - 1] for i in net.getUnconnectedOutLayers().flatten()]
+
+# Create a blob from the input image and perform a forward pass of the YOLO object detector
+blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
+net.setInput(blob)
+start = time.time()
+layerOutputs = net.forward(ln)
+end = time.time()
+
+print("[INFO] YOLO took {:.6f} seconds".format(end - start))
+
+# Initialize lists for detected bounding boxes, confidences, and class IDs
+boxes = []
+confidences = []
+classIDs = []
+
+# Loop over each layer output
+for output in layerOutputs:
+    for detection in output:
+        scores = detection[5:]
+        classID = np.argmax(scores)
+        confidence = scores[classID]
+
+        if confidence > args["confidence"]:
+            box = detection[0:4] * np.array([W, H, W, H])
+            (centerX, centerY, width, height) = box.astype("int")
+
+            x = int(centerX - (width / 2))
+            y = int(centerY - (height / 2))
+
+            boxes.append([x, y, int(width), int(height)])
+            confidences.append(float(confidence))
+            classIDs.append(classID)
+
+# Apply non-maxima suppression to suppress weak, overlapping bounding boxes
+idxs = cv2.dnn.NMSBoxes(boxes, confidences, args["confidence"], args["threshold"])
+
+# Ensure at least one detection exists
+if len(idxs) > 0:
+    list1 = []
+    for i in idxs.flatten():
+        (x, y) = (boxes[i][0], boxes[i][1])
+        (w, h) = (boxes[i][2], boxes[i][3])
+        centerX = round((2 * x + w) / 2)
+        centerY = round((2 * y + h) / 2)
+
+        if centerX <= W / 3:
+            W_pos = "left "
+        elif centerX <= (W / 3 * 2):
+            W_pos = "center "
+        else:
+            W_pos = "right "
+
+        if centerY <= H / 3:
+            H_pos = "top "
+        elif centerY <= (H / 3 * 2):
+            H_pos = "mid "
+        else:
+            H_pos = "bottom "
+
+        list1.append(H_pos + W_pos + LABELS[classIDs[i]])
+
+    description = ', '.join(list1)
+
+    # Convert the description to speech and save it as an MP3 file
+    myobj = gTTS(text=description, lang="en", slow=False)
+    myobj.save("object_detection.mp3")
+    print("Audio description saved as 'object_detection.mp3'.")
+else:
+    print("No objects detected.")
